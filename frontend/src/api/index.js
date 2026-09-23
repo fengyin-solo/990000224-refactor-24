@@ -1,27 +1,30 @@
 import axios from 'axios'
+import { clearSession, getSession } from '../utils/session'
 
 const api = axios.create({
   baseURL: '/api',
   timeout: 10000
 })
 
-// Add token to requests if available
+// Add the current token to authenticated requests.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('blog_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const session = getSession()
+  if (session) {
+    config.headers.Authorization = `Bearer ${session.token}`
   }
   return config
 })
 
-// Handle 401 responses
+// Only an explicit invalid-token response invalidates the local session.
+// Network failures, timeouts, cancellations and other HTTP errors preserve it.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('blog_token')
-      localStorage.removeItem('blog_username')
-      // Optionally redirect to login
+    const isInvalidSession = error.response?.status === 401
+      && !error.config?.authRequest
+
+    if (isInvalidSession) {
+      clearSession({ reason: 'unauthorized' })
     }
     return Promise.reject(error)
   }

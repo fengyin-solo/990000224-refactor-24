@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { clearSession, subscribeSession } from '../utils/session'
 
 const routes = [
   {
@@ -48,11 +49,32 @@ const router = createRouter({
   routes
 })
 
+function redirectToLogin() {
+  const currentRoute = router.currentRoute.value
+  if (!currentRoute.meta.requiresAuth) return
+
+  router.push({
+    name: 'Login',
+    query: { redirect: currentRoute.fullPath }
+  }).catch(() => {
+    // A newer navigation is already taking the user to the login page.
+  })
+}
+
+// Take an already protected page to the login page when the session ends in
+// another tab, reaches its expiry time, or is rejected by the API.
+subscribeSession((event) => {
+  if (event.type === 'clear' && event.reason !== 'manual') {
+    redirectToLogin()
+  }
+})
+
 // Navigation guard for auth
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
     const authStore = useAuthStore()
     if (!authStore.isLoggedIn) {
+      clearSession({ reason: 'guard' })
       next({ name: 'Login', query: { redirect: to.fullPath } })
     } else {
       next()

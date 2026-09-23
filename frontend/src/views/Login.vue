@@ -60,6 +60,7 @@ const authStore = useAuthStore()
 
 const formRef = ref(null)
 const loading = ref(false)
+let activeLogin = 0
 
 const form = reactive({
   username: '',
@@ -80,20 +81,28 @@ async function handleLogin() {
   
   await formRef.value.validate(async (valid) => {
     if (!valid) return
-    
+
+    const loginId = ++activeLogin
     loading.value = true
     try {
       await authStore.login(form.username, form.password)
+      if (loginId !== activeLogin) return
+
       ElMessage.success('登录成功')
-      
+
       // Redirect to the original page or admin dashboard
       const redirect = route.query.redirect || '/admin'
       router.push(redirect)
     } catch (error) {
-      const message = error.response?.data?.error || '登录失败'
+      if (loginId !== activeLogin) return
+
+      const message = error.response?.data?.error
+        || (error.code === 'ECONNABORTED' ? '登录超时，请重试' : '网络异常，请稍后重试')
       ElMessage.error(message)
     } finally {
-      loading.value = false
+      if (loginId === activeLogin) {
+        loading.value = false
+      }
     }
   })
 }
