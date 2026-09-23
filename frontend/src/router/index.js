@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { isTokenUsable } from '../utils/session'
 
 const routes = [
   {
@@ -49,10 +50,12 @@ const router = createRouter({
 })
 
 // Navigation guard for auth
+// 与拦截器共用同一判定：无令牌或令牌已过期都不允许进入受保护页
+// （store 初始化时已清掉过期令牌，这里再兜底一次，保证重开页面也不会放行）
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
     const authStore = useAuthStore()
-    if (!authStore.isLoggedIn) {
+    if (!authStore.isLoggedIn || !isTokenUsable(authStore.token)) {
       next({ name: 'Login', query: { redirect: to.fullPath } })
     } else {
       next()
